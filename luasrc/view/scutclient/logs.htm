@@ -1,0 +1,54 @@
+<%+header%>
+
+<h2>
+	<a id="content" name="content">客户端日志</a>
+</h2>
+
+<div class="cbi-map-descr">
+</div>
+
+<table width="100%" cellspacing="10">
+	<tbody>
+		<tr class="cbi-section-table-row cbi-rowstyle-1">
+			<td width="33%"><strong>配置文件</strong></td>
+			<td><input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="打包下载" onclick='window.open("<%=luci.dispatcher.build_url("admin", "services", "scutclient", "scutclient-log.tar")%>")'></td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>
+	scutclient日志
+</h3>
+
+<div id="content_logs">
+	<textarea style="font-size: 12px;" readonly="readonly" wrap="off" rows="50" id="syslog">
+		Collecting data...
+	</textarea>
+</div>
+
+<script type="text/javascript" language="javascript">
+
+(function () {
+    var stopped = false;
+    window.addEventListener('pagehide', function () { stopped = true; });
+    function readlog() {
+        fetch('<%=luci.dispatcher.build_url("admin", "services", "scutclient", "get_log")%>', {
+            credentials: 'same-origin', cache: 'no-store'
+        }).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.text();
+        }).then(function (text) {
+            var area = document.getElementById('syslog');
+            area.value = text === '_nodata_' ? '' : text;
+            area.scrollTop = area.scrollHeight;
+        }).catch(function (error) {
+            document.getElementById('syslog').value = '日志获取失败：' + error.message;
+        }).then(function () {
+            if (!stopped) window.setTimeout(readlog, 3000);
+        });
+    }
+    readlog();
+}());
+</script>
+
+<%+footer%>

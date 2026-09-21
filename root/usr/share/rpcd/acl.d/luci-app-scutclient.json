@@ -1,0 +1,18 @@
+{
+  "luci-app-scutclient": {
+    "description": "Grant access to SCUTClient configuration",
+    "read": {
+      "uci": [
+        "scutclient",
+        "network",
+        "wireless",
+        "dhcp"
+      ]
+    },
+    "write": {
+      "uci": [
+        "scutclient"
+      ]
+    }
+  }
+}

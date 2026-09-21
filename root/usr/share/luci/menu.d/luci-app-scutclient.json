@@ -1,0 +1,59 @@
+{
+  "admin/services/scutclient": {
+    "title": "华南理工大学客户端",
+    "order": 10,
+    "action": {
+      "type": "firstchild"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-scutclient"
+      ],
+      "fs": {
+        "/etc/config/scutclient": "file"
+      }
+    }
+  },
+  "admin/services/scutclient/status": {
+    "title": "状态",
+    "order": 10,
+    "action": {
+      "type": "call",
+      "module": "luci.controller.scutclient",
+      "function": "action_status"
+    }
+  },
+  "admin/services/scutclient/settings": {
+    "title": "设置",
+    "order": 20,
+    "action": {
+      "type": "call",
+      "module": "luci.dispatcher",
+      "function": "invoke_cbi_action",
+      "parameters": [
+        "scutclient/scutclient",
+        {}
+      ],
+      "post": {
+        "cbi.submit": true
+      }
+    }
+  },
+  "admin/services/scutclient/logs": {
+    "title": "日志",
+    "order": 30,
+    "action": {
+      "type": "template",
+      "path": "scutclient/logs"
+    }
+  },
+  "admin/services/scutclient/about": {
+    "title": "关于",
+    "order": 40,
+    "action": {
+      "type": "call",
+      "module": "luci.controller.scutclient",
+      "function": "action_about"
+    }
+  }
+}
