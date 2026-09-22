@@ -78,7 +78,7 @@ opkg install /tmp/scutclient-ACTUAL_FILENAME.ipk /tmp/luci-app-scutclient-ACTUAL
 sudo apt-get update
 sudo apt-get install --no-install-recommends -y \
   build-essential clang flex bison g++ gawk gcc-multilib gettext git \
-  libncurses-dev libssl-dev python3 python3-setuptools rsync swig unzip \
+  libncurses-dev libssl-dev python3 python3-dev python3-pyelftools python3-setuptools rsync swig unzip \
   zlib1g-dev file wget curl zstd ca-certificates patch perl tar time xz-utils
 ```
 
@@ -89,6 +89,8 @@ bash scripts/build-packages.sh 25.12.2 aarch64_cortex-a53 /tmp/scut-sdk-build /t
 ```
 
 结果位于 `/tmp/scut-packages/packages`，目录中只有两个安装包；构建过程输出到终端。重试时选择新的空路径，脚本不删除已有目录。
+
+`aarch64_generic` 使用 Rockchip SDK，其全局软件包前置检查可能触发 U-Boot 的宿主依赖检查，即使本次只请求 scutclient 软件包。若出现 `Checking 'python3-pyelftools'... failed`，需要在构建机安装 `python3-pyelftools`，不是在路由器上安装。上面的依赖列表已包含它及 `python3-dev`。若安装后仍失败，检查 SDK 实际使用的解释器：在 SDK 目录运行 `staging_dir/host/bin/python3 -c 'import sys; print(sys.executable); import elftools'`，确认没有选到缺少该模块的其他 Python 环境。
 
 ## 检查与扩展
 
