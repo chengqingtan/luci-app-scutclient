@@ -30,3 +30,18 @@
 ## 2026-09-21 本地检查结果
 
 7 个 Lua/模板/JSON 文件通过 Lua 5.1 或 JSON 语法解析，模板内 JavaScript 语法通过。模拟日志 fetch 成功和 HTTP 503：文本正确写入、错误可见、每次完成后安排一次 3 秒刷新。git diff --check 通过。未运行 SDK 编译、真实 LuCI 或路由器认证测试。
+
+## 2026-09-22 Actions 实现检查
+
+- 7 项离线测试通过：十个 SDK 组合选择、未知输入拒绝、IPK 元数据/文件读取、版本和依赖拒绝、ELF 架构/字节序校验、原版页面替换检测、源码 JSON 解析。
+- Actionlint 1.7.12、ShellCheck 0.11.0、Bash 语法检查和 `git diff --check` 通过。
+- 两个版本 × 五个架构的 SDK 文件名与 SHA256 均已逐项比对官方 `sha256sums`。
+- 尚未执行 GitHub Actions 或实际 SDK 编译；当前 Windows 环境没有可用的 WSL/Linux runner。测试使用合成 IPK/ELF 数据，不能替代真实 APK/IPK 和依赖构建验证。
+- 工作流上传前会用 SDK 的 apk 工具或 IPK 解析器检查实际产物；此环节及路由器安装测试仍待首次运行验收。
+
+| 构建验收 | 状态 |
+| --- | --- |
+| 25.12.2 / aarch64_cortex-a53 | 待 GitHub runner 执行 |
+| 24.10.6 / aarch64_cortex-a53 | 待 GitHub runner 执行 |
+| 25.12.2 / all | 待前述单架构验证后执行 |
+| 24.10.6 / all | 待前述单架构验证后执行 |
