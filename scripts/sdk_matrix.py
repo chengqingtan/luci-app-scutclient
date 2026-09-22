@@ -7,12 +7,15 @@ from pathlib import Path
 import re
 
 MANIFEST = Path(__file__).with_name("sdks.json")
+DISTRIBUTIONS = {"immortalwrt": "ImmortalWrt", "openwrt": "OpenWrt"}
+# Keep the original local CLI invocations working, without guessing a distro.
+LEGACY_RELEASES = {version: f"immortalwrt-{version}" for version in ("25.12.2", "24.10.6")}
 
 
 def load_manifest():
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     for release, config in manifest.items():
-        if not re.fullmatch(r"\d+\.\d+\.\d+", release):
+        if not re.fullmatch(r"(immortalwrt|openwrt)-\d+\.\d+\.\d+", release):
             raise ValueError(f"Invalid release: {release}")
         if config["format"] not in ("ipk", "apk"):
             raise ValueError("Invalid package format")
@@ -30,9 +33,11 @@ def load_manifest():
 
 def matrix(release, architecture):
     manifest = load_manifest()
+    release = LEGACY_RELEASES.get(release, release)
     if release not in manifest:
         raise ValueError(f"Unsupported release: {release}")
     config = manifest[release]
+    distribution, version = release.split("-", 1)
     architectures = list(config["targets"]) if architecture == "all" else [architecture]
     rows = []
     for arch in architectures:
@@ -40,22 +45,27 @@ def matrix(release, architecture):
             raise ValueError(f"Unsupported architecture: {arch}")
         target = config["targets"][arch]
         filename = (
-            f"immortalwrt-sdk-{release}-{target['target'].replace('/', '-')}_"
+            f"{distribution}-sdk-{version}-{target['target'].replace('/', '-')}_"
             f"gcc-{config['gcc']}_musl.Linux-x86_64.tar.zst"
         )
         rows.append(dict(
-            release=release, arch=arch, format=config["format"],
+            system=release, distribution=distribution, release=version,
+            label=f"{DISTRIBUTIONS[distribution]} {version}",
+            arch=arch, format=config["format"],
+            core_package_dir=("package/scutclient" if distribution == "openwrt"
+                              else "package/feeds/packages/scutclient"),
             target=target["target"], sha256=target["sha256"], filename=filename,
-            url=f"https://downloads.immortalwrt.org/releases/{release}/targets/{target['target']}/{filename}",
+            url=f"https://downloads.{distribution}.org/releases/{version}/targets/{target['target']}/{filename}",
         ))
     return {"include": rows}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("release")
+    parser.add_argument("release", help="System selector, e.g. openwrt-25.12.5")
     parser.add_argument("architecture")
-    parser.add_argument("--field", choices=("url", "sha256", "format", "arch", "target"))
+    parser.add_argument("--field", choices=("url", "sha256", "format", "arch", "target",
+                                          "system", "distribution", "release", "label", "core_package_dir"))
     args = parser.parse_args()
     try:
         result = matrix(args.release, args.architecture)

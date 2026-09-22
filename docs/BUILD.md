@@ -2,16 +2,20 @@
 
 ## GitHub Actions
 
-1. 将本仓库源码、`.github/workflows/build-packages.yml` 和 `scripts/` 提交并推送到自己的 GitHub 仓库默认分支。
+1. 将本仓库源码、`.github/workflows/build-packages.yml`、`scripts/` 和 `vendor/` 提交并推送到自己的 GitHub 仓库默认分支。
 2. 打开 **Actions → Build scutclient packages → Run workflow**；选择包含所需修改的分支，再选择系统版本和架构。
 3. 等待成功，打开该次运行的 **Artifacts**，分别下载 `scutclient-…apk/ipk` 和 `luci-app-scutclient-…apk/ipk`。使用 `upload-artifact v7` 的 `archive: false` 直接上传原文件，无需解压 ZIP。
 
 工作流仅手动触发；无需 Secrets，权限为 `contents: read`；不创建 Release、不推送提交，也不连接路由器。附件保留 30 天，过期后可重新构建。
 
-| 系统版本 | 软件包格式 |
+| 系统版本选项 | 软件包格式 |
 | --- | --- |
-| ImmortalWrt 25.12.2 | APK |
-| ImmortalWrt 24.10.6 | IPK |
+| immortalwrt-25.12.2 | APK |
+| immortalwrt-24.10.6 | IPK |
+| openwrt-25.12.5 | APK |
+| openwrt-24.10.8 | IPK |
+
+默认仍为 `immortalwrt-25.12.2`。系统与版本绑定为一个选项，避免误用另一发行版的 SDK。请按设备实际安装的发行版选择，不要仅比较版本号或 CPU。
 
 | 架构 | 选用 SDK target/subtarget |
 | --- | --- |
@@ -36,11 +40,13 @@ opkg print-architecture
 
 ## 构建行为与附件
 
-工作流从 `downloads.immortalwrt.org` 获取版本匹配的 Linux x86_64 SDK，并使用 `scripts/sdks.json` 固定的 SHA256 校验。保留 SDK 自带 feed URL/版本信息；核心来自官方 packages feed，本仓库的 LuCI 源码覆盖 SDK 的同名包入口。SDK 决定 IPK/APK 格式，不跨版本强制转换。
+工作流按所选发行版从 `downloads.immortalwrt.org` 或 `downloads.openwrt.org` 获取版本匹配的 Linux x86_64 SDK，并使用 `scripts/sdks.json` 固定的 SHA256 校验。保留 SDK 自带 feed URL/版本信息；本仓库的 LuCI 源码覆盖 SDK 的同名包入口。SDK 决定 IPK/APK 格式，不跨版本强制转换。
+
+ImmortalWrt 的核心继续来自对应官方 packages feed。OpenWrt 这两个版本的 packages feed 没有 scutclient，脚本把 `vendor/scutclient` 复制到 SDK 的 `package/scutclient`，编译固定的 `3.1.3-r2`：包含来自固定 ImmortalWrt 提交的 Makefile 和 CMake 补丁，核心源码下载仍校验 `PKG_HASH`。只导入该包，不混入 ImmortalWrt 的其他 feeds；LuCI、运行库和工具链使用对应 OpenWrt SDK。来源和许可见 `docs/PROVENANCE.md`。
 
 构建只请求两个目标包及其构建依赖。上传前检查软件包名称、版本、依赖和架构；检查 scutclient 的 ELF 类型及字节序；逐文件比较 LuCI 源码与包内文件。为便于核对，禁用 LuCI 源码压缩。LuCI 包的架构显示 `all` 是正常现象，仍应使用与系统版本匹配的附件。
 
-每个版本/架构仅上传两个安装包，不附带日志、校验清单或说明文件。文件名格式为 `包名-包版本-immortalwrt-系统版本-目标架构.apk/ipk`，例如 `luci-app-scutclient-26.264.1-r1-immortalwrt-25.12.2-aarch64_cortex-a53.apk`。目标架构后缀用于区分构建任务，不改变 LuCI 包内部的 `all` 架构元数据。选择 `all` 时共返回十个安装包。
+每个版本/架构仅上传两个安装包，不附带日志、校验清单或说明文件。文件名格式为 `包名-包版本-发行版-系统版本-目标架构.apk/ipk`，例如 `luci-app-scutclient-26.264.1-r1-openwrt-25.12.5-aarch64_cortex-a53.apk`。目标架构后缀用于区分构建任务，不改变 LuCI 包内部的 `all` 架构元数据。选择 `all` 时共返回十个安装包。
 
 SDK 校验和包内容检查仍在上传前执行，失败时不会上传未验证的包。构建日志在 Actions 对应 job 的步骤中查看，不单独上传附件。其他运行依赖仍从路由器对应的软件源安装，不是完整离线安装套件；不缓存构建目录，避免不同 SDK 的中间产物混用。
 
@@ -48,7 +54,7 @@ SDK 校验和包内容检查仍在上传前执行，失败时不会上传未验�
 
 先备份 `/etc/config/scutclient` 和以前手工修改过的 LuCI 文件。将下载的两个安装包传到路由器 `/tmp`，下面的 `ACTUAL_FILENAME` 必须替换为实际文件名中的完整后缀（包含包版本、系统版本和架构）。若只更新界面而核心已满足依赖，也可只安装 LuCI 包。
 
-ImmortalWrt 25.12.2：
+ImmortalWrt 25.12.2 / OpenWrt 25.12.5（选用对应发行版的 APK）：
 
 ```sh
 apk update
@@ -59,7 +65,7 @@ apk add --allow-untrusted /tmp/scutclient-ACTUAL_FILENAME.apk /tmp/luci-app-scut
 
 `--allow-untrusted` 用于这个没有配置路由器信任签名的自编译包，仅用于明确选择的本地文件。不要换用其他系统版本的软件源解决依赖；遇到版本或文件冲突先查看错误，不强制覆盖或降级。
 
-ImmortalWrt 24.10.6：
+ImmortalWrt 24.10.6 / OpenWrt 24.10.8（选用对应发行版的 IPK）：
 
 ```sh
 opkg update
@@ -85,8 +91,12 @@ sudo apt-get install --no-install-recommends -y \
 进入本仓库，工作目录和输出目录都必须尚不存在：
 
 ```sh
-bash scripts/build-packages.sh 25.12.2 aarch64_cortex-a53 /tmp/scut-sdk-build /tmp/scut-packages
+bash scripts/build-packages.sh immortalwrt-25.12.2 aarch64_cortex-a53 /tmp/scut-sdk-build /tmp/scut-packages
+# OpenWrt 示例，使用另两个尚不存在的目录：
+bash scripts/build-packages.sh openwrt-25.12.5 aarch64_cortex-a53 /tmp/scut-openwrt-build /tmp/scut-openwrt-packages
 ```
+
+原本只写 `25.12.2` 或 `24.10.6` 的本地命令仍作为 ImmortalWrt 的别名接受；OpenWrt 必须明确写 `openwrt-` 前缀。
 
 结果位于 `/tmp/scut-packages/packages`，目录中只有两个安装包；构建过程输出到终端。重试时选择新的空路径，脚本不删除已有目录。
 
@@ -103,6 +113,6 @@ shellcheck scripts/build-packages.sh
 actionlint .github/workflows/build-packages.yml
 ```
 
-新增版本时，先确认该版本所有目标的官方 SDK；从官方 `sha256sums` 核对文件名、GCC 版本和 SHA256，添加到 `scripts/sdks.json`，再同步工作流版本选项。新增架构还需补充目标映射、ELF 验证表、工作流选项及测试。不要填写未验证的下载地址或用相近架构代替。
+新增版本时，先确认该版本所有目标的官方 SDK；从官方 `sha256sums` 核对文件名、GCC 版本和 SHA256，以 `发行版-版本` 为键添加到 `scripts/sdks.json`，再同步工作流版本选项。新增架构还需补充目标映射、ELF 验证表、工作流选项及测试。不要填写未验证的下载地址或用相近架构代替。
 
-首次完整验收：先分别构建两个版本的 `aarch64_cortex-a53`；成功后分别选择两个版本的 `all`，覆盖十个组合。
+新增 OpenWrt 首次验收：先分别构建两个 OpenWrt 版本的 `aarch64_cortex-a53`；成功后分别选择 `all`，覆盖新增十个组合。原有 ImmortalWrt 两个版本保持十个组合，共二十个构建组合。离线测试不能替代 SDK 构建和设备安装验证。

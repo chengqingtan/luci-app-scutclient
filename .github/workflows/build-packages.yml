@@ -4,12 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: ImmortalWrt version (25.12 = APK, 24.10 = IPK)
+        description: System and version (25.12 = APK, 24.10 = IPK)
         type: choice
-        default: '25.12.2'
+        default: immortalwrt-25.12.2
         options:
-          - '25.12.2'
-          - '24.10.6'
+          - immortalwrt-25.12.2
+          - immortalwrt-24.10.6
+          - openwrt-25.12.5
+          - openwrt-24.10.8
       architecture:
         description: Package architecture (not the runner CPU)
         type: choice
@@ -43,11 +45,12 @@ jobs:
           python3 -m unittest discover -s tests -v
           bash -n scripts/build-packages.sh
           shellcheck scripts/build-packages.sh
-          echo "matrix=$(python3 scripts/sdk_matrix.py "$RELEASE" "$ARCHITECTURE")" >> "$GITHUB_OUTPUT"
+          matrix=$(python3 scripts/sdk_matrix.py "$RELEASE" "$ARCHITECTURE")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build:
     needs: prepare
-    name: ImmortalWrt ${{ matrix.release }} / ${{ matrix.arch }}
+    name: ${{ matrix.label }} / ${{ matrix.arch }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
@@ -69,7 +72,7 @@ jobs:
       - name: Build and verify both packages
         id: packages
         env:
-          RELEASE: ${{ matrix.release }}
+          RELEASE: ${{ matrix.system }}
           ARCHITECTURE: ${{ matrix.arch }}
           WORK_DIR: ${{ runner.temp }}/scutclient-build
           OUTPUT_DIR: ${{ runner.temp }}/scutclient-output

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $# != 4 ]]; then
-    echo "Usage: bash scripts/build-packages.sh RELEASE ARCH EMPTY_WORK_DIR EMPTY_OUTPUT_DIR" >&2
+    echo "Usage: bash scripts/build-packages.sh SYSTEM ARCH EMPTY_WORK_DIR EMPTY_OUTPUT_DIR" >&2
     exit 2
 fi
 if [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
@@ -16,6 +16,9 @@ arch=$2
 sdk_url=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field url)
 sdk_sha=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field sha256)
 package_format=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field format)
+distribution=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field distribution)
+label=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field label)
+core_package_dir=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field core_package_dir)
 
 # Never delete an existing SDK or mix stale packages into a new build.
 for directory in "$3" "$4"; do
@@ -29,7 +32,7 @@ work_dir=$(cd -- "$3" && pwd)
 output_dir=$(cd -- "$4" && pwd)
 export LC_ALL=C TZ=UTC
 
-echo "Building ImmortalWrt $release / $arch ($package_format)"
+echo "Building $label / $arch ($package_format)"
 curl --fail --location --retry 3 --connect-timeout 30 --output "$work_dir/sdk.tar.zst" "$sdk_url"
 echo "$sdk_sha  $work_dir/sdk.tar.zst" | sha256sum --check --strict
 mkdir "$work_dir/sdk"
@@ -41,7 +44,14 @@ test -f feeds.conf.default
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 test -f feeds/luci/luci.mk
-test -f package/feeds/packages/scutclient/Makefile
+if [[ "$distribution" == openwrt ]]; then
+    # OpenWrt does not ship scutclient. Import only this pinned package recipe;
+    # all runtime libraries and the toolchain remain from the OpenWrt SDK.
+    test ! -e package/feeds/packages/scutclient
+    test ! -e "$core_package_dir"
+    cp -a "$source_dir/vendor/scutclient" "$core_package_dir"
+fi
+test -f "$core_package_dir/Makefile"
 
 # The only active LuCI package entry must refer to this checkout.
 while IFS= read -r -d '' entry; do
@@ -86,7 +96,7 @@ fi
 
 # Separate targets avoid concurrent dependency builds writing to the same SDK.
 jobs=$(nproc)
-for target in package/feeds/packages/scutclient/compile package/luci-app-scutclient/compile; do
+for target in "$core_package_dir/compile" package/luci-app-scutclient/compile; do
     if ! make "$target" -j"$jobs" V=s; then
         echo "Parallel build failed; retrying once with a serial diagnostic log."
         make "$target" -j1 V=s

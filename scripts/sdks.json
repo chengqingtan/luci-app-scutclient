@@ -1,5 +1,5 @@
 {
-  "25.12.2": {
+  "immortalwrt-25.12.2": {
     "format": "apk",
     "gcc": "14.3.0",
     "targets": {
@@ -10,7 +10,7 @@
       "mips_24kc": {"target": "ath79/generic", "sha256": "fed5015c3a35d5cf2b8932e7a14ee7f05ddf403d5319005005a7b0e900ca5c7b"}
     }
   },
-  "24.10.6": {
+  "immortalwrt-24.10.6": {
     "format": "ipk",
     "gcc": "13.3.0",
     "targets": {
@@ -19,6 +19,28 @@
       "x86_64": {"target": "x86/64", "sha256": "709bea2ce466b7ad671ce00fdcb1eb69b2b3fa0f0921b12b620725d95cd8c0e5"},
       "mipsel_24kc": {"target": "ramips/mt7621", "sha256": "10c4afe9a517193e26a60ee73cf2ac968f534ec9e1e3e06f563c85fbaf0febd6"},
       "mips_24kc": {"target": "ath79/generic", "sha256": "f9662dbbf852ad0d2890e59e4db6206db25a66186ef6bc40d0e9d02703d836c1"}
+    }
+  },
+  "openwrt-25.12.5": {
+    "format": "apk",
+    "gcc": "14.3.0",
+    "targets": {
+      "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "ff4a38a397caa2cfe1c39e18f84ddede14878221b3593c3f2c4cfe24e3ec4c25"},
+      "aarch64_generic": {"target": "rockchip/armv8", "sha256": "59194a023968398af64bfa7d8bc3eac322641f6dc9cdbade28a4d9dd41866eba"},
+      "x86_64": {"target": "x86/64", "sha256": "0c8df0151a1e88feb7c03d694d61f6a18d51872815b7c811d76e2b77504d5e9c"},
+      "mipsel_24kc": {"target": "ramips/mt7621", "sha256": "9962084f4131610e90e48bc864c6ceade0b238f15f335de5f672910532b20e9c"},
+      "mips_24kc": {"target": "ath79/generic", "sha256": "bc4307ae2065c0c0b7c84627356e9f3d368a5a803c81552fcb77aa034a843f5a"}
+    }
+  },
+  "openwrt-24.10.8": {
+    "format": "ipk",
+    "gcc": "13.3.0",
+    "targets": {
+      "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482"},
+      "aarch64_generic": {"target": "rockchip/armv8", "sha256": "7ac9801311275b63aea3cba74e68c27fc74ced2a50a0c8f4b0d9adfd8ae768ea"},
+      "x86_64": {"target": "x86/64", "sha256": "ac4a0405d2eea821b06f93c14ba13ffa90ad0457648903df7dde02570027ab21"},
+      "mipsel_24kc": {"target": "ramips/mt7621", "sha256": "9dd11b0517883b016ad7684f5c408a3483eec5b2455b2ffe004c9edd84063e45"},
+      "mips_24kc": {"target": "ath79/generic", "sha256": "e46c4d0127061486ef4ce681f527f8a3980702011cafbf7801aff965a366dd8d"}
     }
   }
 }

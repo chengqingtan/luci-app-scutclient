@@ -131,7 +131,7 @@ def collect(sdk, source, release, arch, output):
         if len(candidates) != 1:
             raise ValueError(f"Expected one {name} package, found {len(candidates)}: {candidates}")
         package = candidates[0]
-        makefile = source / "Makefile" if name.startswith("luci-") else sdk / "feeds/packages/net/scutclient/Makefile"
+        makefile = source / "Makefile" if name.startswith("luci-") else sdk / selection["core_package_dir"] / "Makefile"
         metadata, payload = read_ipk(package) if selection["format"] == "ipk" else read_apk(package, sdk)
         validate_metadata(metadata, name, package_version(makefile), arch)
         validate_payload(name, payload, source, arch)
@@ -144,7 +144,7 @@ def collect(sdk, source, release, arch, output):
         # Raw artifacts use the filename as their name. Include the matrix target
         # even for LuCI's architecture-independent package to prevent collisions.
         filename = (f"{metadata['name']}-{metadata['version']}-"
-                    f"immortalwrt-{release}-{arch}.{selection['format']}")
+                    f"{selection['system']}-{arch}.{selection['format']}")
         destination = output / filename
         shutil.copy2(package, destination)
         key = "core_package" if metadata["name"] == "scutclient" else "luci_package"

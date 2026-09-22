@@ -45,3 +45,12 @@
 | 24.10.6 / aarch64_cortex-a53 | 待 GitHub runner 执行 |
 | 25.12.2 / all | 待前述单架构验证后执行 |
 | 24.10.6 / all | 待前述单架构验证后执行 |
+
+## OpenWrt 25.12.5 / 24.10.8 支持扩展
+
+- 新增 OpenWrt 十个 SDK 组合，文件名和 SHA256 已逐项核对官方下载目录；原有 ImmortalWrt 清单保持一致。
+- scutclient 打包文件和 CMake 补丁与固定 ImmortalWrt 提交的 Git blob 一致；下载 v3.1.3 核心源码后核对 SHA256，并通过补丁应用检查。
+- 9 项离线测试通过，覆盖四个系统版本 × 五种架构的选择、两个核心来源路径、产物收集与命名；每个组合仅产生两个原文件，各组合文件名不冲突。原有纯版本号 CLI 别名继续选择 ImmortalWrt，错误发行版/版本组合会被拒绝。
+- 产物收集测试使用合成 IPK/ELF，APK 解码在测试中模拟；这些测试不代表已生成真实可安装的 OpenWrt 包。
+- Actionlint、ShellCheck、Bash 语法检查和 `git diff --check` 通过。
+- 新增两个 OpenWrt 版本尚未运行 GitHub SDK 构建或路由器安装验证：先分别运行 `aarch64_cortex-a53`，再分别运行 `all`，之后进行 LuCI 和认证功能上机回归。
