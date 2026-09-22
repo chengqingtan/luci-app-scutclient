@@ -4,7 +4,7 @@
 
 1. 将本仓库源码、`.github/workflows/build-packages.yml` 和 `scripts/` 提交并推送到自己的 GitHub 仓库默认分支。
 2. 打开 **Actions → Build scutclient packages → Run workflow**；选择包含所需修改的分支，再选择系统版本和架构。
-3. 等待成功，打开该次运行的 **Artifacts**，下载名称以 `scutclient-immortalwrt-` 开头的附件并解压 ZIP。`logs-` 附件用于排错。
+3. 等待成功，打开该次运行的 **Artifacts**，分别下载 `scutclient-…apk/ipk` 和 `luci-app-scutclient-…apk/ipk`。使用 `upload-artifact v7` 的 `archive: false` 直接上传原文件，无需解压 ZIP。
 
 工作流仅手动触发；无需 Secrets，权限为 `contents: read`；不创建 Release、不推送提交，也不连接路由器。附件保留 30 天，过期后可重新构建。
 
@@ -40,23 +40,19 @@ opkg print-architecture
 
 构建只请求两个目标包及其构建依赖。上传前检查软件包名称、版本、依赖和架构；检查 scutclient 的 ELF 类型及字节序；逐文件比较 LuCI 源码与包内文件。为便于核对，禁用 LuCI 源码压缩。LuCI 包的架构显示 `all` 是正常现象，仍应使用与系统版本匹配的附件。
 
-每个附件包含两个安装包、`build-info.json`、`SHA256SUMS` 和本说明。构建信息记录 SDK、仓库提交、实际 feed 提交和包元数据；其他依赖仍从路由器对应的软件源安装，不是完整离线安装套件。初版不缓存构建目录，避免不同 SDK 的中间产物混用。
+每个版本/架构仅上传两个安装包，不附带日志、校验清单或说明文件。文件名格式为 `包名-包版本-immortalwrt-系统版本-目标架构.apk/ipk`，例如 `luci-app-scutclient-26.264.1-r1-immortalwrt-25.12.2-aarch64_cortex-a53.apk`。目标架构后缀用于区分构建任务，不改变 LuCI 包内部的 `all` 架构元数据。选择 `all` 时共返回十个安装包。
 
-Linux 或路由器中进入解压后的附件目录，先校验：
-
-```sh
-sha256sum -c SHA256SUMS
-```
+SDK 校验和包内容检查仍在上传前执行，失败时不会上传未验证的包。构建日志在 Actions 对应 job 的步骤中查看，不单独上传附件。其他运行依赖仍从路由器对应的软件源安装，不是完整离线安装套件；不缓存构建目录，避免不同 SDK 的中间产物混用。
 
 ## 安装
 
-先备份 `/etc/config/scutclient` 和以前手工修改过的 LuCI 文件。将附件中两个安装包传到路由器 `/tmp`，下面的 `ACTUAL_VERSION` 必须替换为实际文件名。若只更新界面而核心已满足依赖，也可只安装 LuCI 包。
+先备份 `/etc/config/scutclient` 和以前手工修改过的 LuCI 文件。将下载的两个安装包传到路由器 `/tmp`，下面的 `ACTUAL_FILENAME` 必须替换为实际文件名中的完整后缀（包含包版本、系统版本和架构）。若只更新界面而核心已满足依赖，也可只安装 LuCI 包。
 
 ImmortalWrt 25.12.2：
 
 ```sh
 apk update
-apk add --allow-untrusted /tmp/scutclient-ACTUAL_VERSION.apk /tmp/luci-app-scutclient-ACTUAL_VERSION.apk
+apk add --allow-untrusted /tmp/scutclient-ACTUAL_FILENAME.apk /tmp/luci-app-scutclient-ACTUAL_FILENAME.apk
 /etc/init.d/rpcd restart
 /etc/init.d/uhttpd restart
 ```
@@ -67,7 +63,7 @@ ImmortalWrt 24.10.6：
 
 ```sh
 opkg update
-opkg install /tmp/scutclient_ACTUAL_VERSION_ARCH.ipk /tmp/luci-app-scutclient_ACTUAL_VERSION_all.ipk
+opkg install /tmp/scutclient-ACTUAL_FILENAME.ipk /tmp/luci-app-scutclient-ACTUAL_FILENAME.ipk
 /etc/init.d/rpcd restart
 /etc/init.d/uhttpd restart
 ```
@@ -92,7 +88,7 @@ sudo apt-get install --no-install-recommends -y \
 bash scripts/build-packages.sh 25.12.2 aarch64_cortex-a53 /tmp/scut-sdk-build /tmp/scut-packages
 ```
 
-结果位于 `/tmp/scut-packages/packages`，日志位于 `/tmp/scut-packages/logs`。重试时选择新的空路径，脚本不删除已有目录。
+结果位于 `/tmp/scut-packages/packages`，目录中只有两个安装包；构建过程输出到终端。重试时选择新的空路径，脚本不删除已有目录。
 
 ## 检查与扩展
 

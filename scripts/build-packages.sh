@@ -24,14 +24,12 @@ for directory in "$3" "$4"; do
         exit 2
     fi
 done
-mkdir -p -- "$3" "$4/logs"
+mkdir -p -- "$3" "$4"
 work_dir=$(cd -- "$3" && pwd)
 output_dir=$(cd -- "$4" && pwd)
-exec > >(tee "$output_dir/logs/build.log") 2>&1
 export LC_ALL=C TZ=UTC
 
 echo "Building ImmortalWrt $release / $arch ($package_format)"
-python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" > "$output_dir/logs/sdk.json"
 curl --fail --location --retry 3 --connect-timeout 30 --output "$work_dir/sdk.tar.zst" "$sdk_url"
 echo "$sdk_sha  $work_dir/sdk.tar.zst" | sha256sum --check --strict
 mkdir "$work_dir/sdk"
@@ -40,7 +38,6 @@ cd "$work_dir/sdk"
 
 # Preserve release SDK feed URLs and revision pins, including the base feed.
 test -f feeds.conf.default
-cp feeds.conf.default "$output_dir/logs/feeds.conf.default"
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 test -f feeds/luci/luci.mk
@@ -77,7 +74,6 @@ CONFIG_PACKAGE_scutclient=m
 CONFIG_PACKAGE_luci-app-scutclient=m
 EOF
 make defconfig
-cp .config "$output_dir/logs/build.config"
 grep -qx "CONFIG_TARGET_ARCH_PACKAGES=\"$arch\"" .config
 grep -qxE 'CONFIG_PACKAGE_scutclient=[my]' .config
 grep -qxE 'CONFIG_PACKAGE_luci-app-scutclient=[my]' .config
@@ -91,9 +87,9 @@ fi
 # Separate targets avoid concurrent dependency builds writing to the same SDK.
 jobs=$(nproc)
 for target in package/feeds/packages/scutclient/compile package/luci-app-scutclient/compile; do
-    if ! make "$target" -j"$jobs" V=s BUILD_LOG=1; then
+    if ! make "$target" -j"$jobs" V=s; then
         echo "Parallel build failed; retrying once with a serial diagnostic log."
-        make "$target" -j1 V=s BUILD_LOG=1
+        make "$target" -j1 V=s
     fi
 done
 

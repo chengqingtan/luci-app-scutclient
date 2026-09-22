@@ -13,7 +13,7 @@
 - 系统版本：ImmortalWrt `25.12.2`（APK）或 `24.10.6`（IPK）。
 - CPU 架构：`aarch64_cortex-a53`、`aarch64_generic`、`x86_64`、`mipsel_24kc`、`mips_24kc`，或 `all`。
 
-默认为当前路由器对应的 `25.12.2 / aarch64_cortex-a53`。每个组合产生一个包含 **scutclient + luci-app-scutclient** 的下载附件；只手动构建，不自动发布 Release。附件保留 30 天，详细日志单独保存。
+默认为当前路由器对应的 `25.12.2 / aarch64_cortex-a53`。每个组合仅上传 **scutclient** 和 **luci-app-scutclient** 两个安装包，分别直接下载 APK/IPK，无需解压 ZIP。文件名带包版本、系统版本和目标架构，避免 `all` 构建重名。只手动构建，不自动发布 Release；附件保留 30 天，构建日志仅在 Actions 运行页面查看。
 
 首次使用需将工作流提交并推送到 GitHub 默认分支；fork 仓库可能还需在 Actions 页启用工作流。完整步骤、安装命令与新增版本方法见 [构建说明](docs/BUILD.md)。完整 SDK 编译与上机验收状态见 [验证记录](docs/VALIDATION.md)。
 

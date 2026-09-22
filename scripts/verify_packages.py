@@ -2,11 +2,10 @@
 """Inspect package metadata and payloads before publishing CI artifacts."""
 
 import argparse
-from datetime import datetime, timezone
 from email.parser import Parser
-import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -30,11 +29,6 @@ ELF_TARGETS = {
 
 def run(*args):
     return subprocess.check_output([str(arg) for arg in args], text=True).strip()
-
-
-def sha256(path):
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def make_value(path, key):
@@ -145,24 +139,20 @@ def collect(sdk, source, release, arch, output):
 
     # Do not create the artifact directory until BOTH packages pass verification.
     output.mkdir(parents=True)
-    for package, _ in verified:
-        shutil.copy2(package, output / package.name)
-    feeds = {feed.name: run("git", "-C", feed, "rev-parse", "HEAD")
-             for feed in (sdk / "feeds").iterdir() if (feed / ".git").exists()}
-    buildinfo = {
-        "built_at": datetime.now(timezone.utc).isoformat(),
-        "repository_commit": run("git", "-C", source, "rev-parse", "HEAD"),
-        "repository_dirty": bool(run("git", "-C", source, "status", "--porcelain")),
-        "sdk": selection, "feeds": feeds,
-        "packages": [{"file": package.name, "sha256": sha256(package), "metadata": metadata}
-                     for package, metadata in verified],
-    }
-    (output / "build-info.json").write_text(json.dumps(buildinfo, indent=2) + "\n", encoding="utf-8")
-    shutil.copy2(source / "docs/BUILD.md", output / "INSTALL.md")
-    (output / "SHA256SUMS").write_text(
-        "".join(f"{sha256(file)}  {file.name}\n" for file in sorted(output.iterdir()) if file.is_file()),
-        encoding="utf-8",
-    )
+    step_outputs = []
+    for package, metadata in verified:
+        # Raw artifacts use the filename as their name. Include the matrix target
+        # even for LuCI's architecture-independent package to prevent collisions.
+        filename = (f"{metadata['name']}-{metadata['version']}-"
+                    f"immortalwrt-{release}-{arch}.{selection['format']}")
+        destination = output / filename
+        shutil.copy2(package, destination)
+        key = "core_package" if metadata["name"] == "scutclient" else "luci_package"
+        step_outputs.append(f"{key}={destination.as_posix()}\n")
+        print(f"Verified: {filename}")
+    if github_output := os.environ.get("GITHUB_OUTPUT"):
+        with open(github_output, "a", encoding="utf-8") as stream:
+            stream.writelines(step_outputs)
 
 
 def main():
