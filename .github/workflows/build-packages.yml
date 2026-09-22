@@ -1,4 +1,5 @@
 name: Build scutclient packages
+run-name: Build scutclient · ${{ inputs.release }} · ${{ inputs.architecture }}
 
 on:
   workflow_dispatch:
