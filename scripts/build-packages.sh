@@ -19,6 +19,8 @@ package_format=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" 
 distribution=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field distribution)
 label=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field label)
 core_package_dir=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field core_package_dir)
+compression=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field compression)
+luci_runtime=$(python3 "$source_dir/scripts/sdk_matrix.py" "$release" "$arch" --field luci_runtime)
 
 # Never delete an existing SDK or mix stale packages into a new build.
 for directory in "$3" "$4"; do
@@ -33,10 +35,15 @@ output_dir=$(cd -- "$4" && pwd)
 export LC_ALL=C TZ=UTC
 
 echo "Building $label / $arch ($package_format)"
-curl --fail --location --retry 3 --connect-timeout 30 --output "$work_dir/sdk.tar.zst" "$sdk_url"
-echo "$sdk_sha  $work_dir/sdk.tar.zst" | sha256sum --check --strict
+sdk_archive="$work_dir/sdk.tar.$compression"
+curl --fail --location --retry 3 --connect-timeout 30 --output "$sdk_archive" "$sdk_url"
+echo "$sdk_sha  $sdk_archive" | sha256sum --check --strict
 mkdir "$work_dir/sdk"
-tar --zstd -xf "$work_dir/sdk.tar.zst" -C "$work_dir/sdk" --strip-components=1
+case "$compression" in
+    xz) tar --xz -xf "$sdk_archive" -C "$work_dir/sdk" --strip-components=1 ;;
+    zst) tar --zstd -xf "$sdk_archive" -C "$work_dir/sdk" --strip-components=1 ;;
+    *) echo "Unsupported SDK compression: $compression" >&2; exit 2 ;;
+esac
 cd "$work_dir/sdk"
 
 # Preserve release SDK feed URLs and revision pins, including the base feed.
@@ -44,6 +51,15 @@ test -f feeds.conf.default
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 test -f feeds/luci/luci.mk
+# A drifting feed must not silently change the expected dependency profile.
+actual_runtime=builtin
+if [[ -f feeds/luci/modules/luci-lua-runtime/Makefile ]]; then
+    actual_runtime="split"
+fi
+if [[ "$actual_runtime" != "$luci_runtime" ]]; then
+    echo "Unexpected LuCI runtime layout: $actual_runtime (expected $luci_runtime)" >&2
+    exit 1
+fi
 if [[ "$distribution" == openwrt ]]; then
     # OpenWrt does not ship scutclient. Import only this pinned package recipe;
     # all runtime libraries and the toolchain remain from the OpenWrt SDK.

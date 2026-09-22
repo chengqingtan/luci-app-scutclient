@@ -16,7 +16,7 @@ import tempfile
 from sdk_matrix import matrix
 
 PACKAGES = ("scutclient", "luci-app-scutclient")
-LUCI_DEPENDENCIES = {"scutclient", "luci-compat", "luci-lib-nixio", "luci-lua-runtime"}
+LUCI_DEPENDENCIES = {"scutclient", "luci-compat", "luci-lib-nixio"}
 # ELF e_machine, EI_CLASS, EI_DATA. This catches host binaries and MIPS endian mixups.
 ELF_TARGETS = {
     "aarch64_cortex-a53": (183, 2, 1),
@@ -38,8 +38,11 @@ def make_value(path, key):
     return match[1]
 
 
-def package_version(makefile):
-    return f"{make_value(makefile, 'PKG_VERSION')}-r{make_value(makefile, 'PKG_RELEASE')}"
+def package_version(makefile, version_style="revision-r"):
+    if version_style not in {"revision", "revision-r"}:
+        raise ValueError(f"Unknown package version style: {version_style}")
+    marker = "r" if version_style == "revision-r" else ""
+    return f"{make_value(makefile, 'PKG_VERSION')}-{marker}{make_value(makefile, 'PKG_RELEASE')}"
 
 
 def tar_files(data):
@@ -83,7 +86,9 @@ def read_apk(path, sdk):
     return metadata, payload
 
 
-def validate_metadata(metadata, name, version, arch):
+def validate_metadata(metadata, name, version, arch, luci_runtime="split"):
+    if luci_runtime not in {"builtin", "split"}:
+        raise ValueError(f"Unknown LuCI runtime profile: {luci_runtime}")
     if metadata.get("name") != name or metadata.get("version") != version:
         raise ValueError(f"Unexpected name/version for {name}: {metadata}")
     expected_arches = {arch} if name == "scutclient" else {"all", "noarch", arch}
@@ -93,8 +98,11 @@ def validate_metadata(metadata, name, version, arch):
         # adbdump versions may serialize dependencies as strings or objects.
         depends = {re.split(r"[\s<>=~]", dep if isinstance(dep, str) else dep["name"])[0]
                    for dep in metadata.get("depends", [])}
-        if missing := LUCI_DEPENDENCIES - depends:
+        required = LUCI_DEPENDENCIES | ({"luci-lua-runtime"} if luci_runtime == "split" else set())
+        if missing := required - depends:
             raise ValueError(f"Missing LuCI runtime dependencies: {sorted(missing)}")
+        if luci_runtime == "builtin" and "luci-lua-runtime" in depends:
+            raise ValueError("Legacy LuCI must not depend on luci-lua-runtime")
 
 
 def validate_payload(name, payload, source, arch):
@@ -133,7 +141,8 @@ def collect(sdk, source, release, arch, output):
         package = candidates[0]
         makefile = source / "Makefile" if name.startswith("luci-") else sdk / selection["core_package_dir"] / "Makefile"
         metadata, payload = read_ipk(package) if selection["format"] == "ipk" else read_apk(package, sdk)
-        validate_metadata(metadata, name, package_version(makefile), arch)
+        validate_metadata(metadata, name, package_version(makefile, selection["version_style"]),
+                          arch, selection["luci_runtime"])
         validate_payload(name, payload, source, arch)
         verified.append((package, metadata))
 

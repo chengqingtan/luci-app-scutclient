@@ -20,7 +20,7 @@
 - 兼容 APK、opkg 和可执行文件的核心安装检测。
 - 使用 `fetch` 刷新日志，处理请求错误并避免轮询请求重叠。
 
-源码根据原版和排错记录重建，并非设备最终文件的逐字备份。**提供构建选项不等于所有组合都已通过实机认证测试。** OpenWrt 新增组合仍需实际 SDK 构建和设备验证；已完成检查与验收方法见 [验证记录](docs/VALIDATION.md)。
+源码根据原版和排错记录重建，并非设备最终文件的逐字备份。**提供构建选项不等于所有组合都已通过实机认证测试。** 21.02.7 及 OpenWrt 新增组合仍需实际 SDK 构建和设备验证；已完成检查与验收方法见 [验证记录](docs/VALIDATION.md)。
 
 ## 2. 确认系统版本与架构
 
@@ -38,7 +38,7 @@ apk --print-arch
 ```
 
 ```sh
-# 24.10 系列使用 opkg
+# 24.10 / 21.02 系列使用 opkg
 opkg print-architecture
 ```
 
@@ -48,6 +48,7 @@ opkg print-architecture
 | --- | --- | --- |
 | ImmortalWrt 25.12.2 | `immortalwrt-25.12.2` | `.apk` |
 | ImmortalWrt 24.10.6 | `immortalwrt-24.10.6` | `.ipk` |
+| ImmortalWrt 21.02.7 | `immortalwrt-21.02.7` | `.ipk` |
 | OpenWrt 25.12.5 | `openwrt-25.12.5` | `.apk` |
 | OpenWrt 24.10.8 | `openwrt-24.10.8` | `.ipk` |
 
@@ -55,7 +56,7 @@ opkg print-architecture
 
 | architecture 选项 | 构建使用的 SDK target/subtarget |
 | --- | --- |
-| `aarch64_cortex-a53` | `mediatek/filogic` |
+| `aarch64_cortex-a53` | 21.02.7：`sunxi/cortexa53`；其他版本：`mediatek/filogic` |
 | `aarch64_generic` | `rockchip/armv8` |
 | `x86_64` | `x86/64` |
 | `mipsel_24kc` | `ramips/mt7621` |
@@ -83,8 +84,10 @@ luci-app-scutclient-包版本-发行版-系统版本-架构.apk/ipk
 例如界面包可能为：
 
 ```text
-luci-app-scutclient-26.264.1-r1-immortalwrt-25.12.2-aarch64_cortex-a53.apk
+luci-app-scutclient-26.264.1-r2-immortalwrt-25.12.2-aarch64_cortex-a53.apk
 ```
+
+21.02.7 的包版本使用不带 `r` 的修订号，例如 `luci-app-scutclient-26.264.1-2-immortalwrt-21.02.7-x86_64.ipk`。
 
 附件直接下载为 APK/IPK，无需解压 ZIP。文件名中的架构用于区分构建任务；LuCI 包内部的架构元数据显示为 `all` 是正常的，仍应下载与系统版本匹配的文件。
 
@@ -124,7 +127,7 @@ apk add --allow-untrusted /tmp/scutclient-ACTUAL_FILENAME.apk /tmp/luci-app-scut
 
 `--allow-untrusted` 用于安装尚未配置路由器信任签名的自编译本地包，请仅用于确认来源的文件。
 
-### 24.10 系列：安装 IPK
+### 24.10 / 21.02 系列：安装 IPK
 
 ```sh
 opkg update
@@ -157,6 +160,8 @@ luci-lib-nixio
 luci-lua-runtime
 ```
 
+21.02.7 不依赖独立的 `luci-lua-runtime` 包，由该版本的 `luci-base` 及其依赖提供 Lua 支持；不要为旧系统添加新版软件源来安装它。
+
 这些依赖还可能依赖其他软件包。当前 Actions 只提供核心和界面两个文件，**尚未收集完整的离线依赖套件**。
 
 可根据实际情况选择：
@@ -173,7 +178,7 @@ luci-lua-runtime
 scutclient luci-compat luci-lib-nixio luci-lua-runtime
 ```
 
-保留原有默认包，由固件构建服务解析依赖。这样可将未修改的核心及界面依赖预装进固件，之后再安装本仓库的自定义 LuCI 包；无需同时添加官方 `luci-app-scutclient`。是否能构建，以所选版本的软件源和构建服务结果为准。
+如果定制的是 21.02.7，请从上述追加列表中去掉 `luci-lua-runtime`。保留原有默认包，由固件构建服务解析依赖。这样可将未修改的核心及界面依赖预装进固件，之后再安装本仓库的自定义 LuCI 包；无需同时添加官方 `luci-app-scutclient`。是否能构建，以所选版本的软件源和构建服务结果为准。
 
 这个方法用于已有刷机计划的 ImmortalWrt 用户，并非本项目的安装前提。当前支持的两个 OpenWrt 版本，其原生 packages feed 不含 `scutclient`，不能直接照搬这个核心预装步骤。
 
@@ -209,7 +214,7 @@ scutclient luci-compat luci-lib-nixio luci-lua-runtime
 
 ### 同名官方界面已经安装了，怎么办
 
-本项目仍使用 `luci-app-scutclient` 包名，作为同名包进行安装或升级，不会生成第二套独立界面。先备份配置，比较已安装版本和待安装版本。当前自定义版本为 `26.264.1-r1`，不保证高于未来官方版本；遇到拒绝降级或文件冲突时，应先核对版本和文件来源。
+本项目仍使用 `luci-app-scutclient` 包名，作为同名包进行安装或升级，不会生成第二套独立界面。先备份配置，比较已安装版本和待安装版本。当前自定义版本在 24.10/25.12 包中为 `26.264.1-r2`，在 21.02.7 包中为 `26.264.1-2`；这是 SDK 打包规则的区别。该版本不保证高于未来官方版本；遇到拒绝降级或文件冲突时，应先核对版本和文件来源。
 
 ### APK 是 Android 应用吗
 

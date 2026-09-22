@@ -2,6 +2,8 @@
 import io
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tarfile
@@ -26,6 +28,36 @@ def archive(files):
 
 
 class BuildToolsTest(unittest.TestCase):
+    def test_makefile_selects_runtime_and_legacy_luci_version(self):
+        make = shutil.which("make") or shutil.which("mingw32-make")
+        self.assertIsNotNone(make, "GNU make is required to check package metadata")
+        with tempfile.TemporaryDirectory() as temporary:
+            sdk = Path(temporary)
+            (sdk / "rules.mk").write_text("")
+            luci = sdk / "feeds/luci"
+            luci.mkdir(parents=True)
+            # Inspect evaluated values before SDK packaging, without a toolchain.
+            (luci / "luci.mk").write_text(
+                "$(info dependencies=$(LUCI_DEPENDS))\n$(info version=$(PKG_VERSION))\n"
+                ".PHONY: inspect\ninspect: ;\n")
+            for runtime in ("builtin", "split"):
+                if runtime == "split":
+                    marker = luci / "modules/luci-lua-runtime/Makefile"
+                    marker.parent.mkdir(parents=True)
+                    marker.write_text("")
+                output = subprocess.check_output(
+                    [make, "--no-print-directory", "-f", (ROOT / "Makefile").as_posix(),
+                     "TOPDIR=" + sdk.as_posix(), "inspect"], text=True)
+                fields = dict(line.split("=", 1) for line in output.splitlines() if "=" in line)
+                self.assertEqual(set(fields["dependencies"].split()),
+                                 {"+scutclient", "+luci-compat", "+luci-lib-nixio"} |
+                                 ({"+luci-lua-runtime"} if runtime == "split" else set()))
+                if runtime == "builtin":
+                    self.assertEqual(fields["version"], package_version(ROOT / "Makefile", "revision"))
+                else:
+                    # Modern SDK package rules append the revision themselves.
+                    self.assertEqual(fields["version"], "26.264.1")
+
     def test_every_supported_combination(self):
         for release, config in load_manifest().items():
             rows = matrix(release, "all")["include"]
@@ -45,6 +77,51 @@ class BuildToolsTest(unittest.TestCase):
     def test_legacy_versions_still_select_immortalwrt(self):
         for version in ("25.12.2", "24.10.6"):
             self.assertEqual(matrix(version, "all"), matrix(f"immortalwrt-{version}", "all"))
+
+    def test_legacy_sdk_profile_and_modern_regression(self):
+        legacy = matrix("immortalwrt-21.02.7", "all")["include"]
+        self.assertEqual([row["target"] for row in legacy],
+                         ["sunxi/cortexa53", "rockchip/armv8", "x86/64", "ramips/mt7621", "ath79/generic"])
+        for system in load_manifest():
+            old = system == "immortalwrt-21.02.7"
+            for row in matrix(system, "all")["include"]:
+                self.assertTrue(row["filename"].endswith(".tar.xz" if old else ".tar.zst"))
+                self.assertEqual(row["compression"], "xz" if old else "zst")
+                self.assertEqual(row["runner"], "ubuntu-22.04" if old else "ubuntu-24.04")
+                self.assertEqual(row["luci_runtime"], "builtin" if old else "split")
+                self.assertEqual(row["version_style"], "revision" if old else "revision-r")
+                if old:
+                    self.assertIn("gcc-8.4.0", row["filename"])
+                    self.assertEqual(row["format"], "ipk")
+
+    def test_legacy_metadata_requires_legacy_dependencies_and_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recipe = Path(temporary) / "Makefile"
+            recipe.write_text("PKG_VERSION:=3.1.3\nPKG_RELEASE:=2\n")
+            self.assertEqual(package_version(recipe, "revision"), "3.1.3-2")
+            self.assertEqual(package_version(recipe, "revision-r"), "3.1.3-r2")
+        version = package_version(ROOT / "Makefile", "revision")
+        metadata = dict(name="luci-app-scutclient", version=version, arch="all",
+                        depends=["scutclient", "luci-compat", "luci-lib-nixio"])
+        validate_metadata(metadata, metadata["name"], version, "x86_64", "builtin")
+        for dependency in list(metadata["depends"]):
+            bad = dict(metadata, depends=[dep for dep in metadata["depends"] if dep != dependency])
+            with self.assertRaises(ValueError):
+                validate_metadata(bad, metadata["name"], version, "x86_64", "builtin")
+        for bad in (dict(metadata, depends=metadata["depends"] + ["luci-lua-runtime"]),
+                    dict(metadata, version=package_version(ROOT / "Makefile")),
+                    dict(metadata, arch="mips_24kc")):
+            with self.assertRaises(ValueError):
+                validate_metadata(bad, metadata["name"], version, "x86_64", "builtin")
+
+    def test_sdk_profile_rejects_unknown_values(self):
+        for field in ("compression", "runner", "version_style", "luci_runtime"):
+            manifest = load_manifest()
+            manifest["immortalwrt-21.02.7"][field] = "invalid"
+            with patch("sdk_matrix.MANIFEST") as path:
+                path.read_text.return_value = json.dumps(manifest)
+                with self.assertRaises(ValueError):
+                    load_manifest()
 
     def test_unknown_inputs_fail_before_download(self):
         for release, arch in (("snapshot", "x86_64"), ("25.12.2", "arm64"), ("25.12.2", "../all"),
@@ -104,6 +181,11 @@ class BuildToolsTest(unittest.TestCase):
     def test_source_json_is_valid(self):
         for file in (ROOT / "root").rglob("*.json"):
             json.loads(file.read_text(encoding="utf-8"))
+        menu = json.loads((ROOT / "root/usr/share/luci/menu.d/luci-app-scutclient.json").read_text(encoding="utf-8"))
+        action = menu["admin/services/scutclient/settings"]["action"]
+        self.assertEqual(action["module"], "luci.controller.scutclient")
+        self.assertEqual(action["function"], "action_settings")
+        self.assertEqual(action["post"], {"cbi.submit": True})
 
     def test_collect_uses_selected_core_recipe_and_unique_raw_outputs(self):
         # Both formats and both core recipe locations; the APK reader is mocked
@@ -112,12 +194,12 @@ class BuildToolsTest(unittest.TestCase):
         for directory, prefix in (("root", ""), ("luasrc", "usr/lib/lua/luci/")):
             luci_payload.update({prefix + file.relative_to(ROOT / directory).as_posix(): file.read_bytes()
                                  for file in (ROOT / directory).rglob("*") if file.is_file()})
-        luci_version = package_version(ROOT / "Makefile")
         names = set()
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             for system in load_manifest():
                 for row in matrix(system, "all")["include"]:
+                    luci_version = package_version(ROOT / "Makefile", row["version_style"])
                     arch = row["arch"]
                     sdk = base / system / arch / "sdk"
                     recipes = sdk / row["core_package_dir"]
@@ -135,10 +217,12 @@ class BuildToolsTest(unittest.TestCase):
                     package_dir.mkdir(parents=True)
                     decoded = {}
                     for name, version, package_arch, payload in (
-                        ("scutclient", f"3.1.3-r{core_release}", arch, core_payload),
+                        ("scutclient", package_version(recipes / "Makefile", row["version_style"]), arch, core_payload),
                         ("luci-app-scutclient", luci_version, "all", luci_payload),
                     ):
                         depends = ["scutclient", "luci-compat", "luci-lib-nixio", "luci-lua-runtime"] if name.startswith("luci-") else ["libc"]
+                        if row["luci_runtime"] == "builtin" and name.startswith("luci-"):
+                            depends.remove("luci-lua-runtime")
                         metadata = dict(name=name, version=version, arch=package_arch, depends=depends)
                         if row["format"] == "ipk":
                             path = package_dir / f"{name}_{version}_{package_arch}.ipk"
@@ -164,7 +248,7 @@ class BuildToolsTest(unittest.TestCase):
                     values = dict(line.split("=", 1) for line in github_output.read_text().splitlines())
                     self.assertEqual(set(values), {"core_package", "luci_package"})
                     self.assertEqual({Path(path) for path in values.values()}, set(files))
-        self.assertEqual(len(names), 40)
+        self.assertEqual(len(names), 50)
 
 
 if __name__ == "__main__":

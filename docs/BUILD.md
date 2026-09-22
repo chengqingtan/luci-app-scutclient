@@ -12,6 +12,7 @@
 | --- | --- |
 | immortalwrt-25.12.2 | APK |
 | immortalwrt-24.10.6 | IPK |
+| immortalwrt-21.02.7 | IPK |
 | openwrt-25.12.5 | APK |
 | openwrt-24.10.8 | IPK |
 
@@ -19,7 +20,7 @@
 
 | 架构 | 选用 SDK target/subtarget |
 | --- | --- |
-| aarch64_cortex-a53 | mediatek/filogic |
+| aarch64_cortex-a53 | 21.02.7：sunxi/cortexa53；其他版本：mediatek/filogic |
 | aarch64_generic | rockchip/armv8 |
 | x86_64 | x86/64 |
 | mipsel_24kc | ramips/mt7621 |
@@ -34,7 +35,7 @@ cat /etc/openwrt_release
 ubus call system board
 # 25.12:
 apk --print-arch
-# 24.10:
+# 24.10 / 21.02:
 opkg print-architecture
 ```
 
@@ -46,7 +47,7 @@ ImmortalWrt 的核心继续来自对应官方 packages feed。OpenWrt 这两个�
 
 构建只请求两个目标包及其构建依赖。上传前检查软件包名称、版本、依赖和架构；检查 scutclient 的 ELF 类型及字节序；逐文件比较 LuCI 源码与包内文件。为便于核对，禁用 LuCI 源码压缩。LuCI 包的架构显示 `all` 是正常现象，仍应使用与系统版本匹配的附件。
 
-每个版本/架构仅上传两个安装包，不附带日志、校验清单或说明文件。文件名格式为 `包名-包版本-发行版-系统版本-目标架构.apk/ipk`，例如 `luci-app-scutclient-26.264.1-r1-openwrt-25.12.5-aarch64_cortex-a53.apk`。目标架构后缀用于区分构建任务，不改变 LuCI 包内部的 `all` 架构元数据。选择 `all` 时共返回十个安装包。
+每个版本/架构仅上传两个安装包，不附带日志、校验清单或说明文件。文件名格式为 `包名-包版本-发行版-系统版本-目标架构.apk/ipk`，例如 `luci-app-scutclient-26.264.1-r2-openwrt-25.12.5-aarch64_cortex-a53.apk`。目标架构后缀用于区分构建任务，不改变 LuCI 包内部的 `all` 架构元数据。选择 `all` 时共返回十个安装包。
 
 SDK 校验和包内容检查仍在上传前执行，失败时不会上传未验证的包。构建日志在 Actions 对应 job 的步骤中查看，不单独上传附件。其他运行依赖仍从路由器对应的软件源安装，不是完整离线安装套件；不缓存构建目录，避免不同 SDK 的中间产物混用。
 
@@ -65,7 +66,7 @@ apk add --allow-untrusted /tmp/scutclient-ACTUAL_FILENAME.apk /tmp/luci-app-scut
 
 `--allow-untrusted` 用于这个没有配置路由器信任签名的自编译包，仅用于明确选择的本地文件。不要换用其他系统版本的软件源解决依赖；遇到版本或文件冲突先查看错误，不强制覆盖或降级。
 
-ImmortalWrt 24.10.6 / OpenWrt 24.10.8（选用对应发行版的 IPK）：
+ImmortalWrt 21.02.7 / 24.10.6 / OpenWrt 24.10.8（选用对应发行版、版本的 IPK）：
 
 ```sh
 opkg update
@@ -78,7 +79,7 @@ opkg install /tmp/scutclient-ACTUAL_FILENAME.ipk /tmp/luci-app-scutclient-ACTUAL
 
 ## 本地 Linux 构建
 
-使用 x86_64 Linux 或 WSL2，在 Linux 文件系统中构建。Windows PowerShell、Git Bash 不能执行 SDK 内的 Linux 工具。Ubuntu 24.04 安装依赖：
+使用 x86_64 Linux 或 WSL2，在 Linux 文件系统中构建。Windows PowerShell、Git Bash 不能执行 SDK 内的 Linux 工具。21.02.7 的 CI 使用 Ubuntu 22.04，其他版本使用 Ubuntu 24.04。本地也使用对应 Ubuntu 版本，先安装公共依赖：
 
 ```sh
 sudo apt-get update
@@ -88,10 +89,14 @@ sudo apt-get install --no-install-recommends -y \
   zlib1g-dev file wget curl zstd ca-certificates patch perl tar time xz-utils
 ```
 
+仅构建 21.02.7 时，在 Ubuntu 22.04 额外安装 `sudo apt-get install -y python3-distutils`。
+
 进入本仓库，工作目录和输出目录都必须尚不存在：
 
 ```sh
 bash scripts/build-packages.sh immortalwrt-25.12.2 aarch64_cortex-a53 /tmp/scut-sdk-build /tmp/scut-packages
+# 21.02.7 示例，在 Ubuntu 22.04 中使用新的目录：
+bash scripts/build-packages.sh immortalwrt-21.02.7 x86_64 /tmp/scut-2102-build /tmp/scut-2102-packages
 # OpenWrt 示例，使用另两个尚不存在的目录：
 bash scripts/build-packages.sh openwrt-25.12.5 aarch64_cortex-a53 /tmp/scut-openwrt-build /tmp/scut-openwrt-packages
 ```
@@ -104,15 +109,30 @@ bash scripts/build-packages.sh openwrt-25.12.5 aarch64_cortex-a53 /tmp/scut-open
 
 ## 检查与扩展
 
-本地无需 SDK 的检查：
+本地无需 SDK 的检查（需要 Python 3.9+ 和 GNU make；Windows 可使用 mingw32-make）：
 
 ```sh
 python3 -m unittest discover -s tests -v
+# 设置页模拟测试和源码语法检查需要 Lua 5.1（Ubuntu 包名 lua5.1）
+lua5.1 tests/test_settings.lua
+find luasrc -name '*.lua' -print0 | xargs -0 -r -n1 luac5.1 -p
 bash -n scripts/build-packages.sh
 shellcheck scripts/build-packages.sh
 actionlint .github/workflows/build-packages.yml
 ```
 
-新增版本时，先确认该版本所有目标的官方 SDK；从官方 `sha256sums` 核对文件名、GCC 版本和 SHA256，以 `发行版-版本` 为键添加到 `scripts/sdks.json`，再同步工作流版本选项。新增架构还需补充目标映射、ELF 验证表、工作流选项及测试。不要填写未验证的下载地址或用相近架构代替。
+新增版本时，先确认该版本所有目标的官方 SDK；从官方 `sha256sums` 核对文件名、GCC 版本和 SHA256，以 `发行版-版本` 为键添加到 `scripts/sdks.json`，填写 `compression`（xz/zst）、`version_style`（revision/revision-r）、`runner` 和 `luci_runtime`（builtin/split），再同步工作流版本选项。新增架构还需补充目标映射、ELF 验证表、工作流选项及测试。不要填写未验证的下载地址或用相近架构代替。
 
-新增 OpenWrt 首次验收：先分别构建两个 OpenWrt 版本的 `aarch64_cortex-a53`；成功后分别选择 `all`，覆盖新增十个组合。原有 ImmortalWrt 两个版本保持十个组合，共二十个构建组合。离线测试不能替代 SDK 构建和设备安装验证。
+新增 OpenWrt 首次验收：先分别构建两个 OpenWrt 版本的 `aarch64_cortex-a53`；成功后分别选择 `all`，覆盖新增十个组合。原有 ImmortalWrt 两个版本保持十个组合，加上 ImmortalWrt 21.02.7 五个组合，共二十五个构建组合。离线测试不能替代 SDK 构建和设备安装验证。
+
+## ImmortalWrt 21.02.7 兼容细节
+
+21.02.7 使用官方 GCC 8.4.0 的 `.tar.xz` SDK，文件名与 SHA256 固定在清单中；现有版本仍使用 `.tar.zst`。SDK 先通过 SHA256 校验，再按声明的格式解压。五种架构均已核对官方 `profiles.json` 的 `arch_packages`；21.02.7 没有 mediatek/filogic，使用 sunxi/cortexa53 构建 aarch64_cortex-a53 用户态包，不提供跨设备固件。
+
+核心仍使用 SDK 对应 feed 中的 scutclient。LuCI Makefile 根据 SDK 是否提供 `modules/luci-lua-runtime/Makefile` 添加独立运行时依赖，脚本同时检查实际 feed 布局是否符合版本清单，异常则停止。21.02.7 的直接依赖为 scutclient、luci-compat、luci-lib-nixio，Lua 支持由旧版 luci-base 依赖链提供。
+
+设置页统一调用本项目的兼容入口，优先使用新版 `invoke_cbi_action`，旧版使用 `_cbi`；保留 `cbi.submit` 提交保护。两个接口都不存在时明确报错。源码仅维护一份，安装包仍逐文件比对仓库源码。
+
+21.02.7 的包版本遵循 `版本-修订号`，例如 LuCI `26.264.1-2`；其他已支持版本遵循 `版本-r修订号`。旧版 luci.mk 不自动拼接修订号，因此本仓库 Makefile 在旧版路径显式拼接，避免更新丢失修订号。校验器按所选系统检查版本和依赖，不把两种格式无条件视为等价，也不允许旧版产物误依赖 luci-lua-runtime。
+
+首次验收：先运行 `immortalwrt-21.02.7 / x86_64`，再验证其余四个架构（可用 all 覆盖）；现有四个系统版本各运行一个代表架构做回归。支持构建选项不等于已编译成功；实际进度和设备验收状态见 [验证记录](VALIDATION.md)。

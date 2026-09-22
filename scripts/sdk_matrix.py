@@ -19,6 +19,14 @@ def load_manifest():
             raise ValueError(f"Invalid release: {release}")
         if config["format"] not in ("ipk", "apk"):
             raise ValueError("Invalid package format")
+        for key, allowed in (
+            ("compression", {"xz", "zst"}),
+            ("version_style", {"revision", "revision-r"}),
+            ("runner", {"ubuntu-22.04", "ubuntu-24.04"}),
+            ("luci_runtime", {"builtin", "split"}),
+        ):
+            if config.get(key) not in allowed:
+                raise ValueError(f"Invalid SDK {key}")
         if not re.fullmatch(r"\d+\.\d+\.\d+", config["gcc"]):
             raise ValueError("Invalid GCC version")
         for arch, target in config["targets"].items():
@@ -46,12 +54,14 @@ def matrix(release, architecture):
         target = config["targets"][arch]
         filename = (
             f"{distribution}-sdk-{version}-{target['target'].replace('/', '-')}_"
-            f"gcc-{config['gcc']}_musl.Linux-x86_64.tar.zst"
+            f"gcc-{config['gcc']}_musl.Linux-x86_64.tar.{config['compression']}"
         )
         rows.append(dict(
             system=release, distribution=distribution, release=version,
             label=f"{DISTRIBUTIONS[distribution]} {version}",
             arch=arch, format=config["format"],
+            compression=config["compression"], version_style=config["version_style"],
+            runner=config["runner"], luci_runtime=config["luci_runtime"],
             core_package_dir=("package/scutclient" if distribution == "openwrt"
                               else "package/feeds/packages/scutclient"),
             target=target["target"], sha256=target["sha256"], filename=filename,
@@ -65,7 +75,8 @@ def main():
     parser.add_argument("release", help="System selector, e.g. openwrt-25.12.5")
     parser.add_argument("architecture")
     parser.add_argument("--field", choices=("url", "sha256", "format", "arch", "target",
-                                          "system", "distribution", "release", "label", "core_package_dir"))
+                                          "system", "distribution", "release", "label", "core_package_dir",
+                                          "compression", "version_style", "runner", "luci_runtime"))
     args = parser.parse_args()
     try:
         result = matrix(args.release, args.architecture)

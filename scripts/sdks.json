@@ -2,6 +2,10 @@
   "immortalwrt-25.12.2": {
     "format": "apk",
     "gcc": "14.3.0",
+    "compression": "zst",
+    "version_style": "revision-r",
+    "runner": "ubuntu-24.04",
+    "luci_runtime": "split",
     "targets": {
       "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "03c688afec12a97ab2d28daa6469a467be18a7d123da6b278002f897de66ef62"},
       "aarch64_generic": {"target": "rockchip/armv8", "sha256": "732a18e11ccc2ad603762856d14e1b40f8d0b9bb217c288e7c159b639be30a98"},
@@ -13,6 +17,10 @@
   "immortalwrt-24.10.6": {
     "format": "ipk",
     "gcc": "13.3.0",
+    "compression": "zst",
+    "version_style": "revision-r",
+    "runner": "ubuntu-24.04",
+    "luci_runtime": "split",
     "targets": {
       "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "8b4340a9b7e8802a7ffa6feb99604a27025cf702baeab052b931f1bfa6a9f638"},
       "aarch64_generic": {"target": "rockchip/armv8", "sha256": "f467c5053592de610bb8b4d3a0ee9b1e883be84b6c2864aa5ee571b4fdccbe03"},
@@ -24,6 +32,10 @@
   "openwrt-25.12.5": {
     "format": "apk",
     "gcc": "14.3.0",
+    "compression": "zst",
+    "version_style": "revision-r",
+    "runner": "ubuntu-24.04",
+    "luci_runtime": "split",
     "targets": {
       "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "ff4a38a397caa2cfe1c39e18f84ddede14878221b3593c3f2c4cfe24e3ec4c25"},
       "aarch64_generic": {"target": "rockchip/armv8", "sha256": "59194a023968398af64bfa7d8bc3eac322641f6dc9cdbade28a4d9dd41866eba"},
@@ -35,12 +47,31 @@
   "openwrt-24.10.8": {
     "format": "ipk",
     "gcc": "13.3.0",
+    "compression": "zst",
+    "version_style": "revision-r",
+    "runner": "ubuntu-24.04",
+    "luci_runtime": "split",
     "targets": {
       "aarch64_cortex-a53": {"target": "mediatek/filogic", "sha256": "d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482"},
       "aarch64_generic": {"target": "rockchip/armv8", "sha256": "7ac9801311275b63aea3cba74e68c27fc74ced2a50a0c8f4b0d9adfd8ae768ea"},
       "x86_64": {"target": "x86/64", "sha256": "ac4a0405d2eea821b06f93c14ba13ffa90ad0457648903df7dde02570027ab21"},
       "mipsel_24kc": {"target": "ramips/mt7621", "sha256": "9dd11b0517883b016ad7684f5c408a3483eec5b2455b2ffe004c9edd84063e45"},
       "mips_24kc": {"target": "ath79/generic", "sha256": "e46c4d0127061486ef4ce681f527f8a3980702011cafbf7801aff965a366dd8d"}
+    }
+  },
+  "immortalwrt-21.02.7": {
+    "format": "ipk",
+    "gcc": "8.4.0",
+    "compression": "xz",
+    "version_style": "revision",
+    "runner": "ubuntu-22.04",
+    "luci_runtime": "builtin",
+    "targets": {
+      "aarch64_cortex-a53": {"target": "sunxi/cortexa53", "sha256": "eb916e178cf511a9fba3488a77300374caae61cd12804fed968c678fabf659f1"},
+      "aarch64_generic": {"target": "rockchip/armv8", "sha256": "caaed4748588f6c8bf8e4e98fe1ec8dbc3db8da38490b28fccdd5dccb7b4f447"},
+      "x86_64": {"target": "x86/64", "sha256": "f0a78ef42871d21a5df359a44281effa4fe00247c3122636165197f9ccf5816d"},
+      "mipsel_24kc": {"target": "ramips/mt7621", "sha256": "99c08863580c5732d0d9679f4cc88be65ced27cfbab00d4aa2ea1e8957a1705c"},
+      "mips_24kc": {"target": "ath79/generic", "sha256": "83e9fbf520dd5c230b3b1d074284e3fa6e388c294884bae9f838ffb6380a1158"}
     }
   }
 }

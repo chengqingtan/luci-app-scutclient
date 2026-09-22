@@ -31,6 +31,16 @@ function get_log()
 	http.close()
 end
 
+function action_settings(...)
+    local dispatcher = require "luci.dispatcher"
+    if type(dispatcher.invoke_cbi_action) == "function" then
+        return dispatcher.invoke_cbi_action("scutclient/scutclient", {}, ...)
+    elseif type(dispatcher._cbi) == "function" then
+        return dispatcher._cbi({ model = "scutclient/scutclient", config = {} }, ...)
+    end
+    error("SCUTClient: no supported LuCI CBI dispatcher is available")
+end
+
 function action_about()
 	local template = require "luci.template"
 	template.render("scutclient/about")
