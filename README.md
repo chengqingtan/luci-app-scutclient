@@ -4,6 +4,10 @@
 
 **已有路由器系统即可安装，无需为使用本项目重新刷机。** 本仓库输出软件包，不输出路由器固件。
 
+[文档导航](docs/README.md) · [构建指南](docs/BUILD.md) · [开发与目录](docs/DEVELOPMENT.md) · [验证状态](docs/VALIDATION.md)
+
+阅读顺序：[选包](#2-确认系统版本与架构) → [下载或构建](#3-下载或自行构建) → [安装](#4-安装到路由器) → [首次配置](#6-首次配置与使用)。没有网络时先看 [离线安装条件](#5-没有网络时怎样安装)。
+
 ## 1. 先了解两个软件包
 
 | 软件包 | 用途 | 什么时候需要安装 |
@@ -228,29 +232,15 @@ scutclient luci-compat luci-lib-nixio luci-lua-runtime
 
 ## 8. 本地开发与进一步阅读
 
-源码可以在 Windows 或 macOS 上编辑。执行 SDK 构建需要 x86_64 Linux 环境；Windows 可使用 WSL2 并在 Linux 文件系统内构建，PowerShell 和 Git Bash 不能直接运行 SDK 内的 Linux 工具。依赖安装、本地构建命令和扩展版本的方法见 [SDK 构建说明](docs/BUILD.md)。
+源码可以在 Windows 或 macOS 上编辑。SDK 编译需要 x86_64 Linux 环境，Windows 可使用 WSL2；详细环境要求见 [构建指南](docs/BUILD.md)。
 
-| 路径 | 内容 |
+| 需要了解的内容 | 文档 |
 | --- | --- |
-| [Makefile](Makefile) | 自定义 LuCI 包版本、依赖与打包入口 |
-| [luasrc/](luasrc/) | 控制器、设置模型和页面模板 |
-| [root/](root/) | 菜单、RPCD 权限和安装初始化文件 |
-| [.github/workflows/build-packages.yml](.github/workflows/build-packages.yml) | Actions 选项与构建任务 |
-| [scripts/](scripts/) | SDK 清单、构建和产物校验脚本 |
-| [vendor/scutclient/](vendor/scutclient/) | OpenWrt 构建使用的核心打包文件及许可 |
-| [docs/BUILD.md](docs/BUILD.md) | 完整构建、安装与故障诊断说明 |
-| [docs/VALIDATION.md](docs/VALIDATION.md) | 验证记录和设备验收清单 |
-| [docs/PROVENANCE.md](docs/PROVENANCE.md) | 修改来源、上游基线与许可边界 |
-
-维护自己的版本时，先 Fork，再通过 SSH 克隆自己的仓库：
-
-```sh
-git clone git@github.com:YOUR_GITHUB_USERNAME/luci-app-scutclient.git
-cd luci-app-scutclient
-git remote -v
-```
-
-将 `YOUR_GITHUB_USERNAME` 替换为自己的 GitHub 用户名，并确保已配置 GitHub SSH key。提交和推送前使用 `git diff` 检查修改、确认远程地址指向自己的仓库；不要提交真实账号、密码或设备配置。
+| 本地构建、SDK 规则、构建报错 | [构建指南](docs/BUILD.md) |
+| 完整目录树、修改入口、本地检查与 Git 操作 | [开发与目录指南](docs/DEVELOPMENT.md) |
+| 当前验证状态、设备验收与已知限制 | [验证状态](docs/VALIDATION.md) |
+| 上游版本、核心来源和许可边界 | [来源与许可](docs/PROVENANCE.md) |
+| 历史排错和检查记录 | [验证历史](docs/history/VALIDATION-2026-09.md) |
 
 ## 来源与许可
 

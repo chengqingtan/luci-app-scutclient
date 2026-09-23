@@ -1,9 +1,17 @@
+# Local SDK workspaces and collected build outputs
+/.build/
+/output/
+
+# Package artifacts and diagnostic archives
 *.apk
 *.ipk
 *.tar
 *.tar.gz
+*.tar.xz
+*.tar.zst
 *.log
 *.bak
 .DS_Store
 Thumbs.db
+# Python caches
 __pycache__/
