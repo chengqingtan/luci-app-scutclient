@@ -1,5 +1,15 @@
 # 验证记录
 
+## 21.02.7 首次 Actions 日志反馈与版本校验修复
+
+- 用户提供的 aarch64_cortex-a53 日志显示 LuCI 已生成 `luci-app-scutclient_26.264.1-2_all.ipk`，随后产物校验在读取核心 Makefile 时退出：`Missing PKG_VERSION`。本次失败发生在编译后的校验环节，尚未通过最终产物验收。
+- 原因：21.02 核心配方的 PKG_VERSION 是 `$(PKG_BASE_VERSION)-$(PKG_SOURCE_DATE)-$(call version_abbrev,$(PKG_SOURCE_VERSION))`，原解析器仅接受单个无空白字符串，遗漏了这种格式。相同配方供五种架构使用，因此其他 21.02.7 架构也可能触发同一错误。
+- 校验器现支持该已知表达式，从配方独立计算版本并按 21.02 SDK 规则取提交号前八位；当前官方配方对应 `3.1.3-2021-11-26-b265ca8f-1`。固定版本规则保持不变，未知表达式、缺失字段及版本不匹配仍报错，不以包内自报版本代替预期值。
+- 14 项离线测试通过；五个旧版架构的产物收集用例改用真实配方形式和独立写明的预期版本，并增加缺失字段、无效日期/提交号、未知表达式及错误版本测试。此前的简单版本模拟数据未覆盖此次缺陷。
+- 本地未重新执行 Linux SDK 构建。推送修复后应从最新提交启动 `immortalwrt-21.02.7 / all`，重新验收五种架构；重跑旧提交的失败任务不会加载这次修改。
+
+配方来源：[21.02 scutclient Makefile](https://github.com/immortalwrt/packages/blob/openwrt-21.02/net/scutclient/Makefile)；提交号缩写规则：[21.02.7 rules.mk](https://github.com/immortalwrt/immortalwrt/blob/v21.02.7/rules.mk)。
+
 ## 2026-09-23 ImmortalWrt 21.02.7 支持
 
 - 已新增五种架构及 all，保留原有四个系统版本；共 25 个构建组合。21.02.7 使用 GCC 8.4.0、XZ SDK 和 Ubuntu 22.04，其余版本保持原有 SDK、压缩格式和 Ubuntu 24.04。

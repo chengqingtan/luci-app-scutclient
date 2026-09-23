@@ -16,6 +16,15 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from sdk_matrix import load_manifest, matrix
 from verify_packages import collect, package_version, read_ipk, validate_metadata, validate_payload, ELF_TARGETS
 
+# Version declarations from ImmortalWrt packages/openwrt-21.02 net/scutclient.
+LEGACY_CORE_RECIPE = """PKG_BASE_VERSION:=3.1.3
+PKG_RELEASE:=1
+PKG_SOURCE_DATE:=2021-11-26
+PKG_SOURCE_VERSION:=b265ca8ffea204bd1788b0addd42184496b8a118
+PKG_VERSION:=$(PKG_BASE_VERSION)-$(PKG_SOURCE_DATE)-$(call version_abbrev,$(PKG_SOURCE_VERSION))
+"""
+LEGACY_CORE_VERSION = "3.1.3-2021-11-26-b265ca8f-1"
+
 
 def archive(files):
     stream = io.BytesIO()
@@ -28,6 +37,25 @@ def archive(files):
 
 
 class BuildToolsTest(unittest.TestCase):
+    def test_git_based_core_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recipe = Path(temporary) / "Makefile"
+            recipe.write_text(LEGACY_CORE_RECIPE, encoding="utf-8")
+            self.assertEqual(package_version(recipe, "revision"), LEGACY_CORE_VERSION)
+            for bad in (
+                LEGACY_CORE_RECIPE.replace("PKG_BASE_VERSION:=3.1.3\n", ""),
+                LEGACY_CORE_RECIPE.replace("2021-11-26", "invalid-date"),
+                LEGACY_CORE_RECIPE.replace("b265ca8ffea204bd1788b0addd42184496b8a118", "b265ca8f"),
+                LEGACY_CORE_RECIPE.replace("$(call version_abbrev,$(PKG_SOURCE_VERSION))", "$(UNKNOWN)"),
+                "PKG_VERSION:=$(shell echo 3.1.3)\nPKG_RELEASE:=1\n",
+            ):
+                recipe.write_text(bad, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    package_version(recipe, "revision")
+            metadata = dict(name="scutclient", version="3.1.3-1", arch="aarch64_cortex-a53")
+            with self.assertRaises(ValueError):
+                validate_metadata(metadata, "scutclient", LEGACY_CORE_VERSION, "aarch64_cortex-a53")
+
     def test_makefile_selects_runtime_and_legacy_luci_version(self):
         make = shutil.which("make") or shutil.which("mingw32-make")
         self.assertIsNotNone(make, "GNU make is required to check package metadata")
@@ -206,7 +234,12 @@ class BuildToolsTest(unittest.TestCase):
                     recipes.mkdir(parents=True)
                     # Different fixture versions catch reading the wrong recipe.
                     core_release = "2" if row["distribution"] == "openwrt" else "1"
-                    (recipes / "Makefile").write_text(f"PKG_VERSION:=3.1.3\nPKG_RELEASE:={core_release}\n")
+                    if system == "immortalwrt-21.02.7":
+                        (recipes / "Makefile").write_text(LEGACY_CORE_RECIPE)
+                        core_version = LEGACY_CORE_VERSION
+                    else:
+                        (recipes / "Makefile").write_text(f"PKG_VERSION:=3.1.3\nPKG_RELEASE:={core_release}\n")
+                        core_version = f"3.1.3-r{core_release}"
                     machine, elf_class, endian = ELF_TARGETS[arch]
                     header = bytearray(64)
                     header[:6] = b"\x7fELF" + bytes([elf_class, endian])
@@ -217,7 +250,7 @@ class BuildToolsTest(unittest.TestCase):
                     package_dir.mkdir(parents=True)
                     decoded = {}
                     for name, version, package_arch, payload in (
-                        ("scutclient", package_version(recipes / "Makefile", row["version_style"]), arch, core_payload),
+                        ("scutclient", core_version, arch, core_payload),
                         ("luci-app-scutclient", luci_version, "all", luci_payload),
                     ):
                         depends = ["scutclient", "luci-compat", "luci-lib-nixio", "luci-lua-runtime"] if name.startswith("luci-") else ["libc"]

@@ -31,18 +31,44 @@ def run(*args):
     return subprocess.check_output([str(arg) for arg in args], text=True).strip()
 
 
-def make_value(path, key):
-    match = re.search(rf"^{re.escape(key)}\s*:?=\s*(\S+)\s*$", path.read_text(), re.MULTILINE)
+def make_assignment(path, key):
+    # Read the first declaration, not later SDK-specific version overrides.
+    match = re.search(rf"^{re.escape(key)}[ \t]*:?=[ \t]*([^\r\n]*)$",
+                      path.read_text(encoding="utf-8"), re.MULTILINE)
     if not match:
         raise ValueError(f"Missing {key} in {path}")
-    return match[1]
+    return match[1].strip()
+
+
+def make_value(path, key):
+    value = make_assignment(path, key)
+    if not re.fullmatch(r"[A-Za-z0-9_.+~:-]+", value):
+        raise ValueError(f"Unsupported literal {key} in {path}: {value}")
+    return value
 
 
 def package_version(makefile, version_style="revision-r"):
     if version_style not in {"revision", "revision-r"}:
         raise ValueError(f"Unknown package version style: {version_style}")
+    expression = make_assignment(makefile, "PKG_VERSION")
+    if re.fullmatch(
+        r"\$\(PKG_BASE_VERSION\)-\$\(PKG_SOURCE_DATE\)-"
+        r"\$\(call[ \t]+version_abbrev,[ \t]*\$\(PKG_SOURCE_VERSION\)\)", expression
+    ):
+        # The 21.02 scutclient recipe uses this expression. Its SDK rules.mk
+        # abbreviates commits to eight characters for the actual build (not DUMP).
+        base = make_value(makefile, "PKG_BASE_VERSION")
+        date = make_value(makefile, "PKG_SOURCE_DATE")
+        commit = make_value(makefile, "PKG_SOURCE_VERSION")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise ValueError(f"Invalid source date or Git revision in {makefile}")
+        version = f"{base}-{date}-{commit[:8]}"
+    else:
+        # Fail closed on other Make expressions; never trust the artifact's own
+        # version as the expected value or evaluate arbitrary Make/shell code.
+        version = make_value(makefile, "PKG_VERSION")
     marker = "r" if version_style == "revision-r" else ""
-    return f"{make_value(makefile, 'PKG_VERSION')}-{marker}{make_value(makefile, 'PKG_RELEASE')}"
+    return f"{version}-{marker}{make_value(makefile, 'PKG_RELEASE')}"
 
 
 def tar_files(data):
